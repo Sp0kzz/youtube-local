@@ -9,12 +9,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
   const check = document.querySelector("#skip_sponsors");
   check.addEventListener("change", () => {if (check.checked) load_sponsorblock()});
 });
+	  let seekInput;
+	  let gradientStops = [];
 function load_sponsorblock(){
   const info_elem = Q('#skip_n');
   if (info_elem.innerText.length) return;  // already fetched
   const hash = sha256(data.video_id).substr(0,4);
   const video_obj = Q("video");
-  let url = `/https://sponsor.ajay.app/api/skipSegments/${hash}`;
+  let url = `/https://sponsor.ajay.app/api/skipSegments/${hash}?service=YouTube&categories=%5B%22sponsor%22,%22poi_highlight%22,%22selfpromo%22%5D`;
   fetch(url)
       .then(response => response.json())
       .then(r => {
@@ -26,15 +28,73 @@ function load_sponsorblock(){
       info_elem.title = Object.entries(cat_n).map(e=>e.join(': ')).join(', ');
       for (const segment of video.segments) {
         const [start, stop] = segment.segment;
-        if (segment.category != "sponsor") continue;
-        video_obj.addEventListener("timeupdate", function() {
+		let startPosition = ((start ) / (video_obj.duration)) * 100;
+            let stopPosition = ((stop) / (video_obj.duration)) * 100;
+		   		  if (segment.category === "sponsor" ){
+		   gradientStops.push(`transparent ${startPosition}%, transparent ${startPosition}%, green ${startPosition}%, green ${stopPosition}%, transparent ${stopPosition}%, transparent ${stopPosition}%`);   
+           }
+		  else if (segment.category === "selfpromo" ){
+		   gradientStops.push(`transparent ${startPosition}%, transparent ${startPosition}%, yellow ${startPosition}%, yellow ${stopPosition}%, transparent ${stopPosition}%, transparent ${stopPosition}%`);   
+           }
+		   		else  if (segment.category === "poi_highlight"){
+				   stopPosition+=1;		
+				      seekInput = document.querySelector('input[id^="plyr-seek-"]');
+				     const redDiv = document.createElement('div');
+    redDiv.style.position = 'absolute';
+    redDiv.style.left = `${startPosition}%`;
+    redDiv.style.width = `${stopPosition - startPosition}%`;
+    redDiv.style.height = '50%';
+	redDiv.style.top = '5px';
+	redDiv.title="Highlight";
+//	redDiv.style.zIndex="6666";
+	//redDiv.style.pointerEvents = 'none';
+    redDiv.style.backgroundColor = 'red';
+	    seekInput.parentNode.appendChild(redDiv);
+     const highlightSpan = document.createElement('span');
+        highlightSpan.textContent = 'Highlight';
+        highlightSpan.style.position = 'absolute';
+        highlightSpan.style.bottom = '15px';
+        highlightSpan.style.left = `${startPosition}%`;
+		highlightSpan.style.marginLeft="5px";
+        highlightSpan.style.transform = 'translateX(-50%)';
+        highlightSpan.style.backgroundColor = 'black';
+		 highlightSpan.style.zIndex="5555";
+		  highlightSpan.style.fontSize="13px";
+        highlightSpan.style.color = 'white';
+        highlightSpan.style.padding = '2px 5px';
+		  highlightSpan.style.display="none";
+		seekInput.parentNode.appendChild(highlightSpan);
+    seekInput.parentNode.addEventListener('mousemove', function(event) {
+        const rect = redDiv.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+        if (mouseX >= 0 && mouseX <= redDiv.offsetWidth && mouseY >= 0 && mouseY <= redDiv.offsetHeight) {
+            highlightSpan.style.display = "block";
+        } else {
+            highlightSpan.style.display = "none";
+        }
+    });
+
+    seekInput.parentNode.addEventListener('mouseout', function(event) {
+            highlightSpan.style.display = "none";
+    });
+		     }
+		  video_obj.addEventListener("timeupdate", function() {
           if (Q("#skip_sponsors").checked &&
               this.currentTime >= start &&
               this.currentTime < stop-1) {
             this.currentTime = stop;
           }
         });
+       if (segment.category != "sponsor" && segment.category != "selfpromo") continue;	               
       }
+	   const allGradientStops = gradientStops.join(', ');
+	   		 seekInput = document.querySelector('input[id^="plyr-seek-"]');
+	           seekInput.style.backgroundSize = `100% 50%`;
+      seekInput.style.backgroundPosition = `center 5px`;
+	  seekInput.style.backgroundRepeat = 'no-repeat';
+  seekInput.style.backgroundImage = `linear-gradient(to right, ${allGradientStops})`;
+
     }
   });
 }
